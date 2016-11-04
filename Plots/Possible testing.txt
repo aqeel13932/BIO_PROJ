@@ -1,0 +1,20 @@
+Options
+Neural newtworking A
+X G boost A
+RNN BI directional
+LSTM
+Multi
+
+
+
+First day 04/11/16
+Downloaded data. Came to conclusion that missing data is tfa.
+Set about making test data and train data "A". 
+Brought up concerns regarding negative data. 
+Distubted work. 
+Compare mesurements.
+S plans to calulate correlation after ranking them
+A wants to go about a different way.
+
+possible methods for tackling the data
+
