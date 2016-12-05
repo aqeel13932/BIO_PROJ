@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[28]:
+# In[2]:
 
 __author__ = 'aqeel'
 '''Train and evaluate a simple MLP on the Souq.com Reviews newswire topic classification task.
@@ -11,10 +11,11 @@ CPU run command:
     python examples/NNClassifiyReviews.py
 '''
 import numpy as np
-from keras.models import Sequential, load_model
+from keras.models import Sequential, load_model,Model
 from keras.layers.core import Dense, Dropout, Activation
 from keras.utils import np_utils
-from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from keras.callbacks import EarlyStopping,ModelCheckpoint
+from keras.layers.recurrent import LSTM
 import random
 import math
 import pandas as pd
@@ -26,55 +27,44 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+import matplotlib.pyplot as plt
+from ALutils import Calculate_Score,RANK
+np.random.seed(1377)
 
 
 # ### Prepare the data
 
-# In[29]:
+# In[3]:
 
 train = pd.read_csv('../Data/train.csv')
 ftest = pd.read_csv('../Data/test.csv')
-train.columns
-
-
-# In[33]:
-
-def GetData(ds, splitper=0.2):
+#ftest[ftest.columns[[0]+[i for i in range(10,18)]]]
+#train.head()
+def GetData(ds):#, splitper=0.2): Splitter is stopped 
     np.random.seed(1337)
     #Convert The Percentage to split point
-    splitper = int(math.floor(splitper * ds.shape[0] + 1))
+    splitper = 50 #int(math.floor(splitper * ds.shape[0] + 1))
 
     #Shuffle the list
-    ds = ds.iloc[np.random.permutation(len(ds))]
+    #Shuffle is stopped so we can get stable measurements
+    #ds = ds.iloc[np.random.permutation(len(ds))]
     
     #Get tarin,test
-    ls = range(10,18)
+    ls = [i for i in range(10,18)]
     ls+=[0,2]
     x_train = ds.iloc[splitper:][np.delete(ds.columns, ls)]
-    y_train = ds.iloc[splitper:][ds.columns[10:11]]
+    y_train = ds.iloc[splitper:][ds.columns[10:18]]
     x_test = ds.iloc[:splitper][np.delete(ds.columns, ls)]
-    y_test = ds.iloc[:splitper][ds.columns[10:11]]
-    return (x_train.as_matrix(),y_train.as_matrix()),(x_test.as_matrix(),y_test.as_matrix())
+    y_test = ds.iloc[:splitper][ds.columns[10:18]]
+    return (x_train.as_matrix(),y_train.as_matrix()),(x_test.as_matrix(),y_test.as_matrix()) 
 
 
-# In[34]:
-
-def baseline_model(indim,outdim):
-    # create model
-    model = Sequential()
-    model.add(Dense(13, input_dim=indim, init='normal', activation='relu'))
-    model.add(Dense(outdim, init='normal'))
-    # Compile model
-    model.compile(loss='mean_squared_error', optimizer='adam')
-    return model
-
-
-# In[35]:
+# In[4]:
 
 #1-inf
 batch_size = 1
 #1-inf
-nb_epoch = 100
+nb_epoch = 1000
 #Done
 #SGD, RMSprop, Adagrad, Adadelta, Adam, Adamax
 theoptimizer = 'adam'
@@ -87,71 +77,50 @@ thedropout =0.5
 #DONE
 #softmax,softplus,relu,tanh,sigmoid,hard_sigmoid,linear,
 FirstActivation = 'relu'
-SecondActivation='linear'
+SecondActivation='sigmoid'
 #DONE
 #mean_squared_error / mse,root_mean_squared_error / rmse,mean_absolute_error / mae,mean_absolute_percentage_error / mape
 #mean_squared_logarithmic_error / msle,squared_hinge, hinge,binary_crossentropy: Also known as logloss,categorical_crossentropy: Also known as multiclass logloss. Note: using this objective requires that your labels are binary arrays of shape (nb_samples, nb_classes).
 #poisson: mean of (predictions - targets * log(predictions))# cosine_proximity: the opposite (negative) of the mean cosine proximity between predictions and targets.
-theloss='mean_absolute_error'
+theloss='mse'
 #======================
 print('Loading data...')
 
 #(X_train, y_train), (X_test, y_test) =GetData()
-(x_train,y_train),(x_test,y_test) = GetData(train,splitper=0.1)
+(x_train,y_train),(x_test,y_test) = GetData(train)
+#y_train = y_train[:,0]
+#y_test = y_test[:,0]
+print('train:',x_train.shape,y_train.shape)
+print('test: ',x_test.shape,y_test.shape)
 
-print x_train.shape,y_train.shape
-print x_test.shape,y_test.shape
-print x_train.shape[1]
 
-
-# In[36]:
+# In[4]:
 
 print('Building model...')
 model = Sequential()
-model.add(Dense(layernodes,init='normal', input_dim=x_train.shape[1]))
+model.add(Dense(128,init='normal', input_dim=x_train.shape[1]))
 model.add(Activation(FirstActivation))
 model.add(Dropout(thedropout))
-model.add(Dense(y_train.shape[1],init='normal'))
+model.add(Dense(8,init='normal'))
 model.add(Activation(SecondActivation))
-model.compile(loss=theloss, optimizer=theoptimizer,metrics=["mean_absolute_error"])
+model.compile(loss=theloss, optimizer=theoptimizer,metrics=[theloss])
 
-early_stopping = EarlyStopping(monitor='val_loss', patience=31)
-model_checkpoint = ModelCheckpoint('output_files/models/model_{epoch:02d}-{val_loss:.2f}.h5', monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto')
-lr_reducer = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=10, verbose=0, mode='auto', epsilon=0.0001, cooldown=0, min_lr=0)
-#checkpointer = ModelCheckpoint(filepath="weights.hdf5", verbose=1, save_best_only=True,monitor='val_acc',mode='max')
-#losshistory= LossHistory()
-history = model.fit(x_train, y_train, callbacks=[early_stopping, model_checkpoint, lr_reducer], nb_epoch=nb_epoch, batch_size=batch_size, verbose=1, validation_split=0.1)
+early_stopping = EarlyStopping(monitor='val_loss', patience=42)
+model_checkpoint = ModelCheckpoint('output_files/Model_NN:2_{epoch:02d}-{val_loss:.2f}.h5', monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='min')
+history = model.fit(x_train, y_train, nb_epoch=nb_epoch,callbacks=[early_stopping, model_checkpoint], batch_size=batch_size,verbose=1, validation_split=0.1)
+
 score = model.evaluate(x_test, y_test, batch_size=batch_size, verbose=1)
 #results.write(','+str(score[1])+','+str(max(history.history.get('acc'))))
 print('Test score:', score[0])
 print('Test accuracy:', score[1])
 
 
-# In[27]:
+# In[14]:
 
-print x_train[0],y_train[0]
-
-
-# train.head()
-
-# check = 'what the f**k'
-# print check
-# check = clean_str(check)
-# print check
-# #tokenizer.fit_on_texts(check)
-# #Sequence The Training and Testing Set
-# check = tokenizer.texts_to_sequences(check)
-# print check
-# check = tokenizer.sequences_to_matrix(check, mode=sequencemode)
-# print check
-# #model.predict_classes(x_train[0:10])
-
-# model.save('Models/model_{}.h5'.format(sequencemode))
-
-# score = model.evaluate(x_test, y_test, batch_size=batch_size, verbose=1)
-
-# clss = model.predict_classes(x_test)
-
-# with open('Models/performance_{}.txt'.format(sequencemode),'w') as f:
-#     f.write('Accuracy,PPrecision,NPrecision,Precall,Nrecall,\n')
-#     f.write('{},{},{},{},{}\n'.format(Accuracy,PPrecision,NPrecision,Precall,Nrecall))
+org = RANK(y_test)
+print('Perfect Score:',Calculate_Score(org,org))
+#bm = load_model('output_files/t0/Model_01-106548.69.h5')
+#model = load_model('output_files/t0/Model_05-0.12.h5')
+pred = model.predict(x_test)
+pred = RANK(pred)
+print('Current Score:',Calculate_Score(pred,org))
