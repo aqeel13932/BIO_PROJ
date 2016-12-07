@@ -28,23 +28,58 @@ traindata<- read.csv('../Data/train.csv')
 ftest<- read.csv('../Data/test.csv')
 drops<- c("GeneID","wt.t.0","tfA.del.t.0","tfA.del.t.10" ,"tfA.del.t.20" ,"tfA.del.t.30" ,"tfA.del.t.45" ,"tfA.del.t.60" ,"tfA.del.t.90" ,"tfA.del.t.120")
 parameters<- c("absolute.expression..parental.strain.t.0..arbitrary.units.","wt.t.10","wt.t.20","wt.t.30","wt.t.45","wt.t.60","wt.t.90","wt.t.120","tfB.del.t.0" ,"tfB.del.t.10","tfB.del.t.20","tfB.del.t.30","tfB.del.t.45","tfB.del.t.60","tfB.del.t.90","tfB.del.t.120","tfC.del.t.0" ,"tfC.del.t.10","tfC.del.t.20","tfC.del.t.30","tfC.del.t.45","tfC.del.t.60","tfC.del.t.90","tfC.del.t.120" )
+require(xgboost)
+traindata = traindata*1000
 x_train<- traindata[ 51:9285, !(names(traindata) %in% drops)]
-y_train<- traindata[51:9285,11:18]
-x_test<- traindata[ 1:50, !(names(traindata) %in% drops)]
-y_test<-traindata[1:50,11:18]
+dtrain1<-xgb.DMatrix(data= data.matrix(x_train),label = data.matrix(traindata[51:9285,11]))
+dtrain2<-xgb.DMatrix(data= data.matrix(x_train),label = data.matrix(traindata[51:9285,12]))
+dtrain3<-xgb.DMatrix(data= data.matrix(x_train),label = data.matrix(traindata[51:9285,13]))
+dtrain4<-xgb.DMatrix(data= data.matrix(x_train),label = data.matrix(traindata[51:9285,14]))
+dtrain5<-xgb.DMatrix(data= data.matrix(x_train),label = data.matrix(traindata[51:9285,15]))
+dtrain6<-xgb.DMatrix(data= data.matrix(x_train),label = data.matrix(traindata[51:9285,16]))
+dtrain7<-xgb.DMatrix(data= data.matrix(x_train),label = data.matrix(traindata[51:9285,17]))
+dtrain8<-xgb.DMatrix(data= data.matrix(x_train),label = data.matrix(traindata[51:9285,18]))
 
-set.seed(825)
+x_test<- traindata[ 1:50, !(names(traindata) %in% drops)]
+dtest1<-xgb.DMatrix(data= data.matrix(x_test),label = data.matrix(traindata[1:50,11]))
+dtest2<-xgb.DMatrix(data= data.matrix(x_test),label = data.matrix(traindata[1:50,12]))
+dtest3<-xgb.DMatrix(data= data.matrix(x_test),label = data.matrix(traindata[1:50,13]))
+dtest4<-xgb.DMatrix(data= data.matrix(x_test),label = data.matrix(traindata[1:50,14]))
+dtest5<-xgb.DMatrix(data= data.matrix(x_test),label = data.matrix(traindata[1:50,15]))
+dtest6<-xgb.DMatrix(data= data.matrix(x_test),label = data.matrix(traindata[1:50,16]))
+dtest7<-xgb.DMatrix(data= data.matrix(x_test),label = data.matrix(traindata[1:50,17]))
+dtest8<-xgb.DMatrix(data= data.matrix(x_test),label = data.matrix(traindata[1:50,18]))
+
+
 
 #install.packages("drat", repos="https://cran.rstudio.com")
 #drat:::addRepo("dmlc")
 #install.packages("xgboost", repos="http://dmlc.ml/drat/", type = "source")
-data(agaricus.train, package='xgboost')
-data(agaricus.test, package='xgboost')
-train <- agaricus.train
-test <- agaricus.test
-dim(x_train)
-dim(y_train)
-dtrain<-xgb.DMatrix(data= data.matrix(x_train),label = data.matrix(y_train))
-require(xgboost)
-bstSparse <- xgboost(data =data.matrix(x_train), label = data.matrix(y_train), max_depth = 10, eta = 1, nthread = 2, nrounds = 2, objective = "multi:softprob")
-?xgboost
+md=6
+eta=0.3
+nthrd=2
+nronds=10
+
+set.seed(825)
+mod1 <- xgb.train(  data =dtrain1, max_depth = md, eta = eta, nthread =nthrd, nrounds = nronds, objective = "reg:linear")
+mod2 <- xgb.train(data =dtrain2, max_depth = md, eta = eta, nthread =nthrd, nrounds = nronds, objective = "reg:linear")
+mod3 <- xgb.train(data =dtrain3, max_depth = md, eta = eta, nthread =nthrd, nrounds = nronds, objective = "reg:linear")
+mod4 <- xgb.train(data =dtrain4, max_depth = md, eta = eta, nthread =nthrd, nrounds = nronds, objective = "reg:linear")
+mod5 <- xgb.train(data =dtrain5, max_depth = md, eta = eta, nthread =nthrd, nrounds = nronds, objective = "reg:linear")
+mod6 <- xgb.train(data =dtrain6, max_depth = md, eta = eta, nthread =nthrd, nrounds = nronds, objective = "reg:linear")
+mod7 <- xgb.train(data =dtrain7, max_depth = md, eta = eta, nthread =nthrd, nrounds = nronds, objective = "reg:linear")
+mod8 <- xgb.train(data =dtrain8, max_depth = md, eta = eta, nthread =nthrd, nrounds = nronds, objective = "reg:linear")
+
+pred1<-predict(mod1,data.matrix(x_test))
+pred2<-predict(mod2,data.matrix(x_test))
+pred3<-predict(mod3,data.matrix(x_test))
+pred4<-predict(mod4,data.matrix(x_test))
+pred5<-predict(mod5,data.matrix(x_test))
+pred6<-predict(mod6,data.matrix(x_test))
+pred7<-predict(mod7,data.matrix(x_test))
+pred8<-predict(mod8,data.matrix(x_test))
+pred1
+
+pred<- cbind(pred1,pred2,pred3,pred4,pred5,pred6,pred7,pred8)
+evalGold(rankmat(traindata[1:50,11:18]),rankmat(traindata[1:50,11:18]))
+evalGold(rankmat(pred),rankmat(traindata[1:50,11:18]))
